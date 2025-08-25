@@ -1,20 +1,15 @@
-// File: functions/utils/googleSheetsService.js
-
 const { google } = require('googleapis');
-const fs = require('fs');
-const path = require('path');
 
-// Load Google Sheets credentials
+
+// Load Google Sheets credentials from environment variable (Vercel-compatible)
 let credentials;
 
-if (process.env.TEDX_GOOGLE_APPLICATION_CREDENTIALS) {
-  const credentialsPath = path.resolve(process.env.TEDX_GOOGLE_APPLICATION_CREDENTIALS);
-  credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
-} else if (process.env.TEDX_GOOGLE_CREDENTIALS) {
+if (process.env.TEDX_GOOGLE_CREDENTIALS) {
   credentials = JSON.parse(process.env.TEDX_GOOGLE_CREDENTIALS);
 } else {
   throw new Error('❌ Google Sheets credentials are not set.');
 }
+
 
 // Spreadsheet ID from env
 const SHEET_ID = process.env.TEDX_SHEET_ID;
@@ -22,17 +17,20 @@ if (!SHEET_ID) {
   throw new Error('❌ Google Sheet ID is not set in environment variables.');
 }
 
+
 // Create Google Auth client using the JSON object
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
+
 // Column headers for Google Sheet (add department, branch)
 const headers = [
   'Name', 'Email', 'Phone', 'Department', 'Branch', 'Session', 'Amount',
   'Razorpay Order ID', 'Payment ID', 'Ticket ID', 'Created At'
 ];
+
 
 // Function to append a row to Google Sheet
 async function appendRowToSheet(rowData) {
@@ -77,5 +75,6 @@ async function appendRowToSheet(rowData) {
     throw new Error('Failed to update Google Sheet.');
   }
 }
+
 
 module.exports = appendRowToSheet;

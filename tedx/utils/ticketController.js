@@ -42,3 +42,21 @@ exports.getTicketById = async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve ticket' });
   }
 };
+
+// Helper function to create and save a new ticket
+exports.createTicket = async (userData, sessionType, amount, paymentId) => {
+  await ensureDBConnection();
+  const ticket = new Ticket({
+    name: userData.name,
+    email: userData.email,
+    phone: userData.phone,
+    department: userData.department,
+    branch: userData.branch,
+    session: sessionType,
+    amount,
+    paymentId
+  });
+
+  await ticket.save();
+  return ticket;
+};

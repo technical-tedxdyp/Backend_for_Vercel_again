@@ -8,6 +8,7 @@ const { generateTicket } = require('../utils/pdfGenerator');
 const { sendTicketEmail } = require('../utils/email');
 const appendRowToSheet = require('../utils/googleSheetsService');
 const connectDB = require('../utils/db');
+const { bookTicket } = require('../utils/sessionBookingController'); // Import booking logic
 
 const RAZORPAY_KEY_SECRET = process.env.TEDX_RAZORPAY_KEY_SECRET;
 
@@ -29,11 +30,9 @@ const getNextSequenceValue = async (sequenceName) => {
 // Create Razorpay Order
 router.post('/create-order', async (req, res) => {
   const { amount } = req.body;
-
   if (!amount) {
     return res.status(400).json({ error: 'Amount is required' });
   }
-
   try {
     const order = await createOrder(amount * 100);
     res.json(order);
@@ -43,7 +42,7 @@ router.post('/create-order', async (req, res) => {
   }
 });
 
-// Verify Payment & Store Ticket
+// Verify Payment & Store Ticket with booking check
 router.post('/verify-payment', async (req, res) => {
   const {
     razorpay_order_id,
@@ -80,6 +79,9 @@ router.post('/verify-payment', async (req, res) => {
     if (generatedSignature !== razorpay_signature) {
       return res.status(400).json({ success: false, message: 'Invalid payment signature' });
     }
+
+    // Attempt to book ticket (availability check + increment)
+    await bookTicket(session, { name, email, phone, department, branch, amount });
 
     const ticketNumber = await getNextSequenceValue('ticketId');
     const ticketId = `TEDX-${String(ticketNumber).padStart(5, '0')}`;
@@ -138,9 +140,10 @@ router.post('/verify-payment', async (req, res) => {
       message: 'Payment verified, ticket stored, and email sent successfully',
       ticketId: ticket.ticketId
     });
+
   } catch (err) {
-    console.error('Error during payment verification:', err);
-    res.status(500).json({ success: false, message: 'Failed to verify payment, store ticket, or send email' });
+    console.error('Error during payment verification or booking:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to verify payment or book ticket' });
   }
 });
 

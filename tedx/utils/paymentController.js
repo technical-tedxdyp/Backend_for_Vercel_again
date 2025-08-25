@@ -1,36 +1,30 @@
-// File: functions/controllers/paymentController.js
-const functions = require('firebase-functions');
 const crypto = require('crypto');
 const { createOrder } = require('./razorpay');
 const Ticket = require('../models/Ticket');
 const { generateTicket } = require('./pdfGenerator');
 const { sendEmail } = require('./email');
+const { bookTicket } = require('./sessionBookingController');
 
 // Load .env for local development
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
-// Get Razorpay secret from env or Firebase config
-const RAZORPAY_KEY_SECRET =
-  process.env.TEDX_RAZORPAY_KEY_SECRET ||
-  (functions.config().razorpay && functions.config().razorpay.key_secret);
+const RAZORPAY_KEY_SECRET = process.env.TEDX_RAZORPAY_KEY_SECRET;
 
 if (!RAZORPAY_KEY_SECRET) {
   console.warn(
     '⚠️ RAZORPAY_KEY_SECRET is missing. ' +
-    'Set it locally in .env or in Firebase with:\n' +
-    'firebase functions:config:set razorpay.key_secret="your_secret"'
+    'Set it in .env or your Vercel environment variables.'
   );
 }
 
 exports.createPaymentOrder = async (req, res) => {
   try {
-    // Get payment details (add department and branch)
     const { name, email, phone, department, branch, session, amount } = req.body;
 
     if (!name || !email || !phone || !session || !amount) {
-      return res.status(400).json({ error: "All fields are required" });
+      return res.status(400).json({ error: 'All fields are required' });
     }
 
     const order = await createOrder(amount);
@@ -56,17 +50,19 @@ exports.verifyPayment = async (req, res) => {
       amount
     } = req.body;
 
-    // Verify Razorpay Signature
     const generatedSignature = crypto
       .createHmac('sha256', RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
     if (generatedSignature !== razorpay_signature) {
-      return res.status(400).json({ error: "Invalid payment signature" });
+      return res.status(400).json({ error: 'Invalid payment signature' });
     }
 
-    // Save ticket in DB, including department and branch
+    // Book ticket availability and update counters
+    await bookTicket(session, { name, email, phone, department, branch, amount });
+
+    // Save the ticket in DB
     const ticket = new Ticket({
       name,
       email,
@@ -85,18 +81,18 @@ exports.verifyPayment = async (req, res) => {
     const filePath = await generateTicket(ticket.toObject());
     await sendEmail(
       email,
-      "Your TEDx DYP Akurdi Ticket",
-      "Please find your ticket attached.",
+      'Your TEDx DYP Akurdi Ticket',
+      'Please find your ticket attached.',
       filePath
     );
 
     res.json({
       success: true,
-      message: "Payment verified and ticket sent to email",
+      message: 'Payment verified and ticket sent to email',
       ticketId: ticket._id.toString(),
     });
   } catch (err) {
-    console.error('❌ Error in payment verification:', err);
+    console.error('❌ Error in payment verification or booking:', err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -30,7 +30,7 @@ const TicketSchema = new mongoose.Schema({
   },
   session: {
     type: String,
-    enum: ['Morning Session', 'Full Day Session', 'Evening Session'],
+    enum: ['morning', 'evening', 'fullday'],  // Updated to consistent enum values
     required: true
   },
   amount: {
@@ -39,15 +39,19 @@ const TicketSchema = new mongoose.Schema({
   },
   razorpayOrderId: {
     type: String,
-    required: true
+    required: false
   },
   razorpayPaymentId: {
     type: String,
-    required: true
+    required: false
   },
   razorpaySignature: {
     type: String,
-    required: true
+    required: false
+  },
+  paymentId: {  // Optional, you can remove if you use razorpay fields only
+    type: String,
+    required: false
   },
   createdAt: {
     type: Date,
@@ -58,10 +62,8 @@ const TicketSchema = new mongoose.Schema({
     required: true,
     unique: true,
     index: true,
-    default: uuidv4  // Automatically generates unique id if not provided
+    default: uuidv4  // Automatically generate unique id if not provided
   }
 });
-
-// Removed pre-validation hook for ticketId because default handles this
 
 module.exports = mongoose.model('Ticket', TicketSchema);
